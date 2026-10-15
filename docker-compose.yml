@@ -1,0 +1,143 @@
+name: wormhole
+
+services:
+  token-service-db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: token_service
+      POSTGRES_USER: token_service
+      POSTGRES_PASSWORD: token_service
+    volumes:
+      - token-service-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U token_service -d token_service"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  token-service:
+    image: ghcr.io/llnl/wormhole-token-service:v0.2.2
+    restart: unless-stopped
+    depends_on:
+      token-service-db:
+        condition: service_healthy
+    environment:
+      DYNACONF_DB__url: postgresql://token_service:token_service@token-service-db:5432/token_service
+      DYNACONF_DB__username: token_service
+      DYNACONF_DB__password: token_service
+      DYNACONF_SERVER__host: 0.0.0.0
+      DYNACONF_SERVER__port: "5000"
+      DYNACONF_AUTH__auth_name: local_dev
+      DYNACONF_AUTH__local_dev__uid: admin
+      DYNACONF_AUTH__local_dev__is_admin: "true"
+      OTEL_SERVICE_NAME: token-service
+      OTEL_TRACES_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    ports:
+      - "${TOKEN_SERVICE_PORT:-5000}:5000"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+
+        wormhole_token_service generate-jwks --overwrite
+        export DYNACONF_AUTH__jwt__active_kid=1
+        export DYNACONF_AUTH__jwt__keys__1__key_type=RSA
+        export DYNACONF_AUTH__jwt__keys__1__public_pem="$(cat /app/jwks/public.pem)"
+        export DYNACONF_AUTH__jwt__keys__1__private_pem="$(cat /app/jwks/private.pem)"
+
+        alembic upgrade head
+        wormhole_token_service seed-dev-user
+
+        exec opentelemetry-instrument wormhole_token_service run
+
+  route-registry-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: route_registry
+      POSTGRES_USER: route_registry
+      POSTGRES_PASSWORD: route_registry
+    volumes:
+      - route-registry-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U route_registry -d route_registry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  route-registry-rabbitmq:
+    image: rabbitmq:3.8
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: route_registry
+      RABBITMQ_DEFAULT_PASS: route_registry
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  route-registry:
+    image: ghcr.io/llnl/wormhole-route-registry:v0.1.2
+    restart: unless-stopped
+    depends_on:
+      route-registry-db:
+        condition: service_healthy
+      route-registry-rabbitmq:
+        condition: service_healthy
+    environment:
+      DYNACONF_DB__url: postgresql://route_registry:route_registry@route-registry-db:5432/route_registry
+      DYNACONF_DB__username: route_registry
+      DYNACONF_DB__password: route_registry
+      DYNACONF_CELERY__broker_url: amqp://route_registry:route_registry@route-registry-rabbitmq:5672//
+      DYNACONF_SERVER__host: 0.0.0.0
+      DYNACONF_SERVER__port: "5001"
+      DYNACONF_AUTH__auth_name: base_auth
+      DYNACONF_AUTH__token_service__host: http://token-service:5000
+      DYNACONF_URL__token_service__base_url: http://token-service:5000
+      OTEL_SERVICE_NAME: route-registry
+      OTEL_TRACES_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    ports:
+      - "${ROUTE_REGISTRY_PORT:-5001}:5001"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+
+        wormhole_route_registry generate-jwks --overwrite
+        export DYNACONF_AUTH__jwt__active_kid=1
+        export DYNACONF_AUTH__jwt__keys__1__key_type=RSA
+        export DYNACONF_AUTH__jwt__keys__1__public_pem="$(cat /app/jwks/public.pem)"
+        export DYNACONF_AUTH__jwt__keys__1__private_pem="$(cat /app/jwks/private.pem)"
+
+        alembic upgrade head
+
+        exec opentelemetry-instrument wormhole_route_registry run
+
+  route-registry-worker:
+    image: ghcr.io/llnl/wormhole-route-registry:v0.1.2
+    restart: unless-stopped
+    depends_on:
+      route-registry-db:
+        condition: service_healthy
+      route-registry-rabbitmq:
+        condition: service_healthy
+    environment:
+      DYNACONF_DB__url: postgresql://route_registry:route_registry@route-registry-db:5432/route_registry
+      DYNACONF_DB__username: route_registry
+      DYNACONF_DB__password: route_registry
+      DYNACONF_CELERY__broker_url: amqp://route_registry:route_registry@route-registry-rabbitmq:5672//
+      OTEL_SERVICE_NAME: route-registry-worker
+      OTEL_TRACES_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    command: ["listen-tasks"]
+
+volumes:
+  token-service-db-data:
+  route-registry-db-data:

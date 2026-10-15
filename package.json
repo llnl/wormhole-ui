@@ -1,0 +1,48 @@
+{
+  "name": "wormhole-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Wormhole UI",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "playwright test",
+    "test:integration": "playwright test --config=playwright.integration.config.ts",
+    "gen:api-types": "npm run gen:token-service-api-types && npm run gen:route-registry-api-types",
+    "gen:token-service-api-types": "openapi-typescript http://localhost:${TOKEN_SERVICE_PORT:-5000}/openapi.json -o src/token-service-api-types.ts && npm run lint:fix",
+    "gen:route-registry-api-types": "openapi-typescript http://localhost:${ROUTE_REGISTRY_PORT:-5001}/openapi.json -o src/route-registry-api-types.ts && npm run lint:fix",
+    "check:api-types": "npm run gen:api-types && git diff --exit-code -- src/token-service-api-types.ts src/route-registry-api-types.ts",
+    "lint": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\" &&eslint .",
+    "lint:fix": "eslint . --fix && prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\""
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "7.3.1",
+    "@fortawesome/free-brands-svg-icons": "7.3.1",
+    "@fortawesome/free-regular-svg-icons": "7.3.1",
+    "@fortawesome/free-solid-svg-icons": "7.3.1",
+    "luxon": "3.7.2",
+    "mithril": "2.3.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/luxon": "3.7.4",
+    "@types/mithril": "2.2.9",
+    "@types/node": "26.6.2",
+    "daisyui": "5.7.16",
+    "eslint": "10.8.1",
+    "eslint-config-prettier": "10.1.8",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vite": "8.2.1"
+  }
+}

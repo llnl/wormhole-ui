@@ -1,0 +1,12 @@
+# IDE settings
+.vscode/
+.idea/
+
+# MacOS directory metadata files
+**/.DS_Store
+
+node_modules/
+dist/
+test-results/
+playwright-report/
+playwright/.cache/
