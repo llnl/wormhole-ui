@@ -11,3 +11,16 @@ updates:
       npm:
         update-types:
           - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 100
+    groups:
+      github-actions:
+        update-types:
+          - "minor"
+          - "patch"
