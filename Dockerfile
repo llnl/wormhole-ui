@@ -1,4 +1,6 @@
-FROM node:26-alpine AS builder
+# The build output is platform-independent static files, so build them natively
+# once instead of under emulation for each target platform
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 WORKDIR /app
 
