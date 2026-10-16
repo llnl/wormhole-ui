@@ -17,7 +17,7 @@ services:
       retries: 10
 
   token-service:
-    image: ghcr.io/llnl/wormhole-token-service:v0.2.2
+    image: ghcr.io/llnl/wormhole-token-service:v0.2.5
     restart: unless-stopped
     depends_on:
       token-service-db:
@@ -81,7 +81,7 @@ services:
       retries: 10
 
   route-registry:
-    image: ghcr.io/llnl/wormhole-route-registry:v0.1.2
+    image: ghcr.io/llnl/wormhole-route-registry:v0.1.4
     restart: unless-stopped
     depends_on:
       route-registry-db:
@@ -120,7 +120,7 @@ services:
         exec opentelemetry-instrument wormhole_route_registry run
 
   route-registry-worker:
-    image: ghcr.io/llnl/wormhole-route-registry:v0.1.2
+    image: ghcr.io/llnl/wormhole-route-registry:v0.1.4
     restart: unless-stopped
     depends_on:
       route-registry-db:

@@ -181,6 +181,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v2/route': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List User Routes */
+    get: operations['list_user_routes_api_v2_route_get'];
+    put?: never;
+    /** Register */
+    post: operations['register_api_v2_route_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/latest/route': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List User Routes */
+    get: operations['list_user_routes_api_latest_route_get'];
+    put?: never;
+    /** Register */
+    post: operations['register_api_latest_route_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/route/hello-world': {
     parameters: {
       query?: never;
@@ -198,24 +234,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v2/route': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Available */
-    get: operations['list_available_api_v2_route_get'];
-    put?: never;
-    /** Register */
-    post: operations['register_api_v2_route_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v2/route/hello-world': {
     parameters: {
       query?: never;
@@ -227,24 +245,6 @@ export interface paths {
     get: operations['hello_api_v2_route_hello_world_get'];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/latest/route': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Available */
-    get: operations['list_available_api_latest_route_get'];
-    put?: never;
-    /** Register */
-    post: operations['register_api_latest_route_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -403,6 +403,17 @@ export interface components {
        */
       disallowed: components['schemas']['EntitySet'] | null;
     };
+    /**
+     * Status
+     * @enum {string}
+     */
+    Status:
+      | 'UP'
+      | 'MISCONFIGURED'
+      | 'MISSING_ENTITY'
+      | 'UPGRADE_REQUIRED'
+      | 'SERVER_ERROR'
+      | 'DOWN';
     /** Tunnel */
     Tunnel: {
       /** Url */
@@ -425,6 +436,11 @@ export interface components {
       /** Context */
       ctx?: Record<string, never>;
     };
+    /**
+     * VerificationStatus
+     * @enum {string}
+     */
+    VerificationStatus: 'VERIFIED' | 'PENDING' | 'UNVERIFIED';
   };
   responses: never;
   parameters: never;
@@ -861,27 +877,13 @@ export interface operations {
       };
     };
   };
-  hello_api_v1_route_hello_world_get: {
+  list_user_routes_api_v2_route_get: {
     parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: Record<string, unknown>;
-        content: {
-          'application/json': unknown;
-        };
+      query?: {
+        name?: string;
+        status?: components['schemas']['Status'];
+        verification_status?: components['schemas']['VerificationStatus'];
       };
-    };
-  };
-  list_available_api_v2_route_get: {
-    parameters: {
-      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -893,6 +895,13 @@ export interface operations {
         headers: Record<string, unknown>;
         content: {
           'application/json': components['schemas']['Route'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -928,27 +937,13 @@ export interface operations {
       };
     };
   };
-  hello_api_v2_route_hello_world_get: {
+  list_user_routes_api_latest_route_get: {
     parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: Record<string, unknown>;
-        content: {
-          'application/json': unknown;
-        };
+      query?: {
+        name?: string;
+        status?: components['schemas']['Status'];
+        verification_status?: components['schemas']['VerificationStatus'];
       };
-    };
-  };
-  list_available_api_latest_route_get: {
-    parameters: {
-      query?: never;
       header?: never;
       path?: never;
       cookie?: never;
@@ -960,6 +955,13 @@ export interface operations {
         headers: Record<string, unknown>;
         content: {
           'application/json': components['schemas']['Route'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };
@@ -991,6 +993,42 @@ export interface operations {
         headers: Record<string, unknown>;
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  hello_api_v1_route_hello_world_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  hello_api_v2_route_hello_world_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': unknown;
         };
       };
     };

@@ -249,10 +249,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Config
+     * @description Get the service settings exposed to clients.
+     */
+    get: operations['get_config_api_v1_config_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/latest/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Config
+     * @description Get the service settings exposed to clients.
+     */
+    get: operations['get_config_api_latest_config_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * ConfigResponse
+     * @description Service settings exposed to clients.
+     */
+    ConfigResponse: {
+      token: components['schemas']['TokenConfigResponse'];
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -298,6 +345,14 @@ export interface components {
        * @default false
        */
       rotatable: boolean | null;
+    };
+    /** TokenConfigResponse */
+    TokenConfigResponse: {
+      /**
+       * Max Lifetime Days
+       * @description Maximum token lifetime in days
+       */
+      max_lifetime_days: number;
     };
     /** TokenRotationRequest */
     TokenRotationRequest: {
@@ -758,6 +813,42 @@ export interface operations {
         headers: Record<string, unknown>;
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_config_api_v1_config_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': components['schemas']['ConfigResponse'];
+        };
+      };
+    };
+  };
+  get_config_api_latest_config_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: Record<string, unknown>;
+        content: {
+          'application/json': components['schemas']['ConfigResponse'];
         };
       };
     };
