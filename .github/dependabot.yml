@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 100
+    groups:
+      npm:
+        update-types:
+          - "patch"
