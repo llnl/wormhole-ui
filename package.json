@@ -35,7 +35,7 @@
     "@types/mithril": "2.2.9",
     "@types/node": "26.6.5",
     "daisyui": "5.7.47",
-    "eslint": "10.8.1",
+    "eslint": "10.12.0",
     "eslint-config-prettier": "10.1.8",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.9",
