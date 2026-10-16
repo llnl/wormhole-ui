@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeRoute, mockRouteRegistryApi } from './route-registry-fixtures';
 
 test.describe('Routes page', () => {

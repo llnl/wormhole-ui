@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { mockTokenServiceApi } from './token-service-fixtures';
 import { mockRouteRegistryApi } from './route-registry-fixtures';
 

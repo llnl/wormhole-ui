@@ -2,6 +2,7 @@ import m from 'mithril';
 import { faShieldHalved } from '@fortawesome/free-solid-svg-icons';
 import { TokenRepository } from '../../../repositories/TokenRepository';
 import type { Token } from '../../../models/Token';
+import { getConfig } from '../../../config';
 import Icon from '../../shared/Icon';
 import AttestTokenRow from './AttestTokenRow';
 
@@ -19,6 +20,9 @@ interface AttestTokensButtonState {
   isLoading: boolean;
   error: string | null;
 }
+
+const formatDays = (days: number): string =>
+  `${String(days)} ${days === 1 ? 'day' : 'days'}`;
 
 const AttestTokensButton: m.Component<
   AttestTokensButtonAttrs,
@@ -59,8 +63,9 @@ const AttestTokensButton: m.Component<
             m(
               'p',
               'You must verify that each token is still needed at least ' +
-                'once every 30 days, or it will expire. On the next ' +
-                'screen, you will confirm each token individually.'
+                `once every ${formatDays(getConfig().tokenService.maxTokenLifetimeDays)}, ` +
+                'or it will expire. On the next screen, you will confirm ' +
+                'each token individually.'
             ),
           ]),
           m('div', { class: 'tw:d-modal-action tw:mt-6' }, [

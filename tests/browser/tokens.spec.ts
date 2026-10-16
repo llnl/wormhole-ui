@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeToken, mockTokenServiceApi } from './token-service-fixtures';
 
 test.describe('Tokens page', () => {
