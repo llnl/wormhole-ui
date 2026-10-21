@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
+import type { GetTokenServiceConfigResponse } from '../../src/token-service-api-bodies';
 
 let tokenName: string;
 
@@ -50,7 +51,14 @@ test.describe.serial('Tokens page (live backend)', () => {
     await expect(reloadedRow).toBeHidden();
   });
 
-  test('attests a token', async ({ page }) => {
+  test('attests a token', async ({ page, request }) => {
+    const tokenServiceConfigResponse = await request.get(
+      '/token-service/api/v1/config'
+    );
+    expect(tokenServiceConfigResponse.ok()).toBeTruthy();
+    const tokenServiceConfig =
+      (await tokenServiceConfigResponse.json()) as GetTokenServiceConfigResponse;
+
     tokenName = randomUUID();
     await page.goto('/tokens');
 
@@ -60,6 +68,11 @@ test.describe.serial('Tokens page (live backend)', () => {
     await expect(page.getByTestId('created-token-alert')).toBeVisible();
 
     await page.getByTestId('attest-tokens-button').click();
+    await expect(
+      page.getByText(
+        `once every ${String(tokenServiceConfig.token.max_lifetime_days)} days`
+      )
+    ).toBeVisible();
     await page.getByTestId('attest-acknowledge-button').click();
 
     const row = page.getByTestId(`attest-token-row-${tokenName}`);

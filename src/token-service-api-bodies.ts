@@ -12,3 +12,7 @@ export type CreateTokenResponse = JsonResponse<
 export type AttestTokensRequest = JsonRequestBody<
   operations['attestation_api_v1_token_attestation_patch']
 >;
+export type GetTokenServiceConfigResponse = JsonResponse<
+  operations['get_config_api_v1_config_get'],
+  200
+>;

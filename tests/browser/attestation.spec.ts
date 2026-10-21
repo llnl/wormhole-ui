@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeToken, mockTokenServiceApi } from './token-service-fixtures';
 
 test.describe('Token attestation', () => {
@@ -123,5 +123,19 @@ test.describe('Token attestation', () => {
       page.getByRole('heading', { name: 'Token Attestation' })
     ).toBeHidden();
     await expect(page.getByTestId(`token-row-${token.name}`)).toBeVisible();
+  });
+
+  test.describe('with a non-default token lifetime', () => {
+    test.use({ tokenServiceConfig: { token: { max_lifetime_days: 45 } } });
+
+    test('states the attestation interval from the token-service config', async ({
+      page,
+    }) => {
+      await mockTokenServiceApi(page, []);
+      await page.goto('/tokens');
+
+      await page.getByTestId('attest-tokens-button').click();
+      await expect(page.getByText('once every 45 days')).toBeVisible();
+    });
   });
 });
