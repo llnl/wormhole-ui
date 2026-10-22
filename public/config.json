@@ -1,0 +1,4 @@
+{
+  "tokenServiceUrl": "/token-service",
+  "routeRegistryUrl": "/route-registry"
+}

@@ -36,7 +36,7 @@ try {
 
 // Use plain paths (e.g. /routes) instead of Mithril's default hashbang
 // (#!/routes) style routing.
-m.route.prefix = '';
+m.route.prefix = new URL(document.baseURI).pathname.replace(/\/$/, '');
 
 // Any unmatched path, including /, falls back to the default route /tokens.
 m.route(root, '/tokens', {

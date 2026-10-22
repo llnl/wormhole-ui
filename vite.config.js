@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => {
     process.env.ROUTE_REGISTRY_PORT || env.ROUTE_REGISTRY_PORT || 5001;
 
   return {
+    // Relative, so assets resolve against <base href>.
+    base: './',
     plugins: [tailwindcss()],
     server: {
       proxy: {

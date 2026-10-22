@@ -44,6 +44,19 @@ above). Assumes the database is empty and restores that state afterward, so it r
 serially.
 
 
+## Container configuration
+
+The image serves the UI on port 8080, configured at startup by:
+
+| Variable                      | Default           | Description                           |
+|-------------------------------|-------------------|---------------------------------------|
+| `WORMHOLE_BASE_PATH`          | `/wormhole`       | Path the UI is served under           |
+| `WORMHOLE_TOKEN_SERVICE_URL`  | `/token-service`  | Browser-facing token-service API URL  |
+| `WORMHOLE_ROUTE_REGISTRY_URL` | `/route-registry` | Browser-facing route-registry API URL |
+
+Values can't contain quotes. `/health` is served at the root regardless of the base path.
+With a read-only root filesystem, `/etc/nginx/conf.d` must be writable.
+
 ## Governance
 
 Contributions are welcome. Contributors should look in `CONTRIBUTING.md` for project guidelines on how to create and structure pull requests.

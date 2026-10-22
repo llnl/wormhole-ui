@@ -1,4 +1,5 @@
 import { AbstractRepository } from './AbstractRepository';
+import { getUiConfig } from '../config';
 import { Token } from '../models/Token';
 import type {
   ListTokensResponse,
@@ -8,7 +9,7 @@ import type {
 
 export class TokenRepository extends AbstractRepository {
   public constructor() {
-    super('/token-service');
+    super(() => getUiConfig().tokenServiceUrl);
   }
 
   public async getAllTokens(): Promise<Token[]> {

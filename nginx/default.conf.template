@@ -1,0 +1,39 @@
+server {
+    listen 8080;
+    listen [::]:8080;
+    server_name _;
+    server_tokens off;
+    absolute_redirect off;
+
+    root /nonexistent;
+
+    # Liveness/readiness probe; independent of the built assets.
+    location = /health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    rewrite ^${WORMHOLE_BASE_PATH}$ ${WORMHOLE_BASE_PATH}/ permanent;
+
+    location = ${WORMHOLE_BASE_PATH}/config.json {
+        default_type application/json;
+        add_header Cache-Control "no-cache";
+        return 200 '{"tokenServiceUrl":"${WORMHOLE_TOKEN_SERVICE_URL}","routeRegistryUrl":"${WORMHOLE_ROUTE_REGISTRY_URL}"}';
+    }
+
+    # Vite emits content-hashed file names, so these can be cached indefinitely.
+    location ${WORMHOLE_BASE_PATH}/assets/ {
+        alias /usr/share/nginx/wormhole/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location ${WORMHOLE_BASE_PATH}/ {
+        alias /usr/share/nginx/wormhole/;
+        try_files $uri $uri/ ${WORMHOLE_BASE_PATH}/index.html;
+        add_header Cache-Control "no-cache";
+        # Must match the tag in index.html exactly.
+        sub_filter '<base href="/">' '<base href="${WORMHOLE_BASE_PATH}/">';
+    }
+}
