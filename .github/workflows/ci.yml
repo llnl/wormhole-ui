@@ -110,11 +110,11 @@ jobs:
         run: docker run -d --name wormhole-ui -p 8080:8080 wormhole-ui
 
       # /health doesn't touch the built assets, and the base image ships its own
-      # index.html, so check that / is the app's page
+      # index.html, so check that /wormhole/ is the app's page
       - name: Check the container serves the UI
         run: |
           timeout 30 bash -c 'until curl -sf -o /dev/null http://localhost:8080/health; do sleep 1; done'
-          curl -fsS http://localhost:8080/ | grep -q '<title>Wormhole</title>'
+          curl -fsS http://localhost:8080/wormhole/ | grep -q '<title>Wormhole</title>'
 
       - name: Show container logs
         if: failure()

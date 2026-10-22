@@ -9,10 +9,10 @@ interface ApiError {
 }
 
 export abstract class AbstractRepository {
-  protected constructor(private readonly basePath: string) {}
+  protected constructor(private readonly basePath: () => string) {}
 
   private url(route: string): string {
-    return `${this.basePath}${route}`;
+    return `${this.basePath()}${route}`;
   }
 
   private normalizeError(error: unknown): Error {

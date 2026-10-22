@@ -1,0 +1,3 @@
+#!/bin/sh
+base_path="/${WORMHOLE_BASE_PATH#/}"
+export WORMHOLE_BASE_PATH="${base_path%/}"
