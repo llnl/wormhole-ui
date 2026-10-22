@@ -53,6 +53,7 @@ The image serves the UI on port 8080, configured at startup by:
 | `WORMHOLE_BASE_PATH`          | `/wormhole`       | Path the UI is served under           |
 | `WORMHOLE_TOKEN_SERVICE_URL`  | `/token-service`  | Browser-facing token-service API URL  |
 | `WORMHOLE_ROUTE_REGISTRY_URL` | `/route-registry` | Browser-facing route-registry API URL |
+| `WORMHOLE_LOGIN_URL`          | `/token-service/auth/login?next=` | Login URL; the page's URL is appended |
 
 Values can't contain quotes. `/health` is served at the root regardless of the base path.
 With a read-only root filesystem, `/etc/nginx/conf.d` must be writable.

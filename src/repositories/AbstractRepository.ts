@@ -1,4 +1,5 @@
 import m from 'mithril';
+import { redirectToLogin } from '../login';
 
 interface ApiError {
   response?: {
@@ -7,6 +8,14 @@ interface ApiError {
   };
   message?: string;
 }
+
+const parseJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
 
 export abstract class AbstractRepository {
   protected constructor(private readonly basePath: () => string) {}
@@ -41,63 +50,52 @@ export abstract class AbstractRepository {
     return new Error('An unexpected error occurred.');
   }
 
-  protected async get<T>(
+  private async request<T>(
+    method: string,
     route: string,
-    params?: Record<string, unknown>
+    { params, ...init }: RequestInit & { params?: m.Params } = {}
   ): Promise<T> {
+    const query = params === undefined ? '' : m.buildQueryString(params);
     try {
-      return await m.request<T>(this.url(route), {
-        method: 'GET',
-        params: params,
-      });
+      const response = await fetch(
+        query ? `${this.url(route)}?${query}` : this.url(route),
+        { ...init, method, redirect: 'manual' }
+      );
+      if (response.type === 'opaqueredirect') {
+        return await redirectToLogin();
+      }
+
+      const text = await response.text();
+      if (!response.ok) {
+        throw Object.assign(new Error(text), { response: parseJson(text) });
+      }
+      return (text ? JSON.parse(text) : null) as T;
     } catch (error: unknown) {
       throw this.normalizeError(error);
+    } finally {
+      m.redraw();
     }
   }
 
-  protected async post<T>(
-    route: string,
-    data: Record<string, string>
-  ): Promise<T> {
-    try {
-      return await m.request<T>(this.url(route), {
-        method: 'POST',
-        body: new URLSearchParams(data).toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        serialize: (body: string): string => body,
-      });
-    } catch (error: unknown) {
-      throw this.normalizeError(error);
-    }
+  protected get<T>(route: string, params?: m.Params): Promise<T> {
+    return this.request<T>('GET', route, { params });
   }
 
-  protected async delete(
-    route: string,
-    params?: Record<string, unknown>
-  ): Promise<void> {
-    try {
-      await m.request<unknown>(this.url(route), {
-        method: 'DELETE',
-        params: params,
-      });
-    } catch (error: unknown) {
-      throw this.normalizeError(error);
-    }
+  protected post<T>(route: string, data: Record<string, string>): Promise<T> {
+    return this.request<T>('POST', route, { body: new URLSearchParams(data) });
+  }
+
+  protected async delete(route: string, params?: m.Params): Promise<void> {
+    await this.request('DELETE', route, { params });
   }
 
   protected async patch(
     route: string,
     data: Record<string, unknown>
   ): Promise<void> {
-    try {
-      await m.request<unknown>(this.url(route), {
-        method: 'PATCH',
-        body: data,
-      });
-    } catch (error: unknown) {
-      throw this.normalizeError(error);
-    }
+    await this.request('PATCH', route, {
+      body: JSON.stringify(data),
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }

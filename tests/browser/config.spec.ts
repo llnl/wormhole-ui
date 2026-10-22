@@ -46,6 +46,7 @@ test.describe('Config', () => {
     const uiConfig: UiConfigSchema = {
       tokenServiceUrl: '/custom/token-service',
       routeRegistryUrl: '/custom/route-registry',
+      loginUrl: '/custom/login?next=',
     };
     await page.route(
       (url) => url.pathname === '/config.json',
