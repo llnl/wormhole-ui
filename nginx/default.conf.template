@@ -19,7 +19,7 @@ server {
     location = ${WORMHOLE_BASE_PATH}/config.json {
         default_type application/json;
         add_header Cache-Control "no-cache";
-        return 200 '{"tokenServiceUrl":"${WORMHOLE_TOKEN_SERVICE_URL}","routeRegistryUrl":"${WORMHOLE_ROUTE_REGISTRY_URL}"}';
+        return 200 '{"tokenServiceUrl":"${WORMHOLE_TOKEN_SERVICE_URL}","routeRegistryUrl":"${WORMHOLE_ROUTE_REGISTRY_URL}","loginUrl":"${WORMHOLE_LOGIN_URL}"}';
     }
 
     # Vite emits content-hashed file names, so these can be cached indefinitely.

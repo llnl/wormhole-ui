@@ -1,4 +1,5 @@
 {
   "tokenServiceUrl": "/token-service",
-  "routeRegistryUrl": "/route-registry"
+  "routeRegistryUrl": "/route-registry",
+  "loginUrl": "/token-service/auth/login?next="
 }
