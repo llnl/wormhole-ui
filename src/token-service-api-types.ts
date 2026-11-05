@@ -349,6 +349,11 @@ export interface components {
     /** TokenConfigResponse */
     TokenConfigResponse: {
       /**
+       * Session Name
+       * @description Name of the MFA session token
+       */
+      session_name: string;
+      /**
        * Max Lifetime Days
        * @description Maximum token lifetime in days
        */

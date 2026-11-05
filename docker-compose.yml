@@ -17,7 +17,7 @@ services:
       retries: 10
 
   token-service:
-    image: ghcr.io/llnl/wormhole-token-service:v0.2.5
+    image: ghcr.io/llnl/wormhole-token-service:v0.2.6
     restart: unless-stopped
     depends_on:
       token-service-db:

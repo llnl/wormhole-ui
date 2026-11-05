@@ -79,6 +79,20 @@ test.describe('Token attestation', () => {
     await expect(page.getByTestId(`token-row-${token.name}`)).toBeHidden();
   });
 
+  test('does not offer the session token for attestation', async ({ page }) => {
+    const token = makeToken();
+    await mockTokenServiceApi(page, [makeToken({ name: '_session' }), token]);
+    await page.goto('/tokens');
+
+    await page.getByTestId('attest-tokens-button').click();
+    await page.getByTestId('attest-acknowledge-button').click();
+
+    await expect(
+      page.getByTestId(`attest-token-row-${token.name}`)
+    ).toBeVisible();
+    await expect(page.getByTestId('attest-token-row-_session')).toBeHidden();
+  });
+
   test('shows expired tokens as non-actionable', async ({ page }) => {
     const nowSeconds = Math.floor(Date.now() / 1000);
     const token = makeToken({ exp: nowSeconds - 3600 });
@@ -126,7 +140,11 @@ test.describe('Token attestation', () => {
   });
 
   test.describe('with a non-default token lifetime', () => {
-    test.use({ tokenServiceConfig: { token: { max_lifetime_days: 45 } } });
+    test.use({
+      tokenServiceConfig: {
+        token: { session_name: '_session', max_lifetime_days: 45 },
+      },
+    });
 
     test('states the attestation interval from the token-service config', async ({
       page,

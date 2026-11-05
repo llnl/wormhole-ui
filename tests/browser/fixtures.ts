@@ -10,7 +10,10 @@ interface ConfigOptions {
  * mocked one. Override it with test.use({ tokenServiceConfig: ... }).
  */
 export const test = base.extend<ConfigOptions>({
-  tokenServiceConfig: [{ token: { max_lifetime_days: 30 } }, { option: true }],
+  tokenServiceConfig: [
+    { token: { session_name: '_session', max_lifetime_days: 30 } },
+    { option: true },
+  ],
   page: async ({ page, tokenServiceConfig }, use) => {
     await page.route(
       (url) => url.pathname === '/token-service/api/v1/config',
