@@ -18,6 +18,34 @@ test.describe('Tokens page', () => {
     await expect(page.getByTestId(`token-row-${token.name}`)).toBeVisible();
   });
 
+  test('hides the session token', async ({ page }) => {
+    const token = makeToken();
+    await mockTokenServiceApi(page, [makeToken({ name: '_session' }), token]);
+    await page.goto('/tokens');
+
+    await expect(page.getByTestId(`token-row-${token.name}`)).toBeVisible();
+    await expect(page.getByTestId('token-row-_session')).toBeHidden();
+  });
+
+  test.describe('with a non-default session token name', () => {
+    test.use({
+      tokenServiceConfig: {
+        token: { session_name: 'custom-session', max_lifetime_days: 30 },
+      },
+    });
+
+    test('hides the token with the configured name', async ({ page }) => {
+      await mockTokenServiceApi(page, [
+        makeToken({ name: 'custom-session' }),
+        makeToken({ name: '_session' }),
+      ]);
+      await page.goto('/tokens');
+
+      await expect(page.getByTestId('token-row-_session')).toBeVisible();
+      await expect(page.getByTestId('token-row-custom-session')).toBeHidden();
+    });
+  });
+
   test('creates a new token and shows the one-time secret', async ({
     page,
   }) => {

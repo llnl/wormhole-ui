@@ -1,5 +1,5 @@
 import { AbstractRepository } from './AbstractRepository';
-import { getUiConfig } from '../config';
+import { getConfig, getUiConfig } from '../config';
 import { Token } from '../models/Token';
 import type {
   ListTokensResponse,
@@ -14,8 +14,11 @@ export class TokenRepository extends AbstractRepository {
 
   public async getAllTokens(): Promise<Token[]> {
     const tokens = await this.get<ListTokensResponse>('/api/v1/token');
+    const { sessionTokenName } = getConfig().tokenService;
 
-    return tokens.map((token) => new Token(token));
+    return tokens
+      .filter((token) => token.name !== sessionTokenName)
+      .map((token) => new Token(token));
   }
 
   public async createToken(token: Token): Promise<string> {
