@@ -2,8 +2,20 @@ import m from 'mithril';
 import { RouteRepository } from '../../../repositories/RouteRepository';
 import type { Route } from '../../../models/Route';
 import RouteRow from './RouteRow';
+import SortableHeader from '../../shared/SortableHeader';
+import { TableSort } from '../../shared/TableSort';
 
 const routeRepo: RouteRepository = new RouteRepository();
+
+const routeSort = new TableSort(
+  {
+    name: (route: Route) => route.name,
+    src: (route: Route) => route.src,
+    dst: (route: Route) => route.dst,
+    community: (route: Route) => route.communityName,
+  },
+  'name'
+);
 
 interface RouteTableState {
   routes: Route[];
@@ -17,15 +29,40 @@ const RouteTable: m.Component<Record<string, never>, RouteTableState> = {
     });
   },
   view: ({ state }) => {
-    const routes: Route[] = state.routes;
+    const routes: Route[] = routeSort.apply(state.routes);
     return m('div', { class: 'tw:overflow-x-auto' }, [
       m('table', { class: 'tw:d-table tw:w-full tw:border' }, [
         m('thead', [
           m('tr', [
-            m('th', { class: 'tw:w-full' }, 'Name'),
-            m('th', { class: 'tw:whitespace-nowrap' }, 'Public URL'),
-            m('th', { class: 'tw:whitespace-nowrap' }, 'Destination'),
-            m('th', { class: 'tw:whitespace-nowrap' }, 'Community'),
+            m(
+              SortableHeader,
+              { column: routeSort.column('name'), class: 'tw:w-full' },
+              'Name'
+            ),
+            m(
+              SortableHeader,
+              {
+                column: routeSort.column('src'),
+                class: 'tw:whitespace-nowrap',
+              },
+              'Public URL'
+            ),
+            m(
+              SortableHeader,
+              {
+                column: routeSort.column('dst'),
+                class: 'tw:whitespace-nowrap',
+              },
+              'Destination'
+            ),
+            m(
+              SortableHeader,
+              {
+                column: routeSort.column('community'),
+                class: 'tw:whitespace-nowrap',
+              },
+              'Community'
+            ),
           ]),
         ]),
         m('tbody', [

@@ -20,4 +20,32 @@ test.describe('Routes page', () => {
       row.getByRole('link', { name: route.src ?? '' })
     ).toHaveAttribute('href', route.src ?? '');
   });
+
+  test('sorts routes by the clicked column', async ({ page }) => {
+    await mockRouteRegistryApi(page, [
+      makeRoute({ name: 'route-10', community_name: 'community-a' }),
+      makeRoute({ name: 'route-1', community_name: 'community-b' }),
+      makeRoute({ name: 'route-2' }),
+    ]);
+    await page.goto('/routes');
+
+    const names = page.locator('[data-testid^="route-row-"] > td:first-child');
+    const nameHeader = page.getByRole('columnheader', {
+      name: 'Name',
+      exact: true,
+    });
+    await expect(names).toHaveText(['route-1', 'route-2', 'route-10']);
+    await expect(nameHeader).toHaveAttribute('aria-sort', 'ascending');
+
+    await page.getByTestId('sort-by-name').click();
+    await expect(names).toHaveText(['route-10', 'route-2', 'route-1']);
+    await expect(nameHeader).toHaveAttribute('aria-sort', 'descending');
+
+    // Routes without a community sort last in both directions.
+    await page.getByTestId('sort-by-community').click();
+    await expect(names).toHaveText(['route-10', 'route-1', 'route-2']);
+    await expect(nameHeader).not.toHaveAttribute('aria-sort');
+    await page.getByTestId('sort-by-community').click();
+    await expect(names).toHaveText(['route-1', 'route-10', 'route-2']);
+  });
 });
