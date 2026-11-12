@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { AbstractModel } from './AbstractModel';
 import type { components } from '../token-service-api-types';
 
@@ -23,5 +24,13 @@ export class Token extends AbstractModel {
     this.paths = data.paths ?? null;
     this.scopes = data.scopes ?? null;
     this.rotatable = data.rotatable ?? null;
+  }
+
+  public isExpired(now: DateTime = DateTime.now()): boolean {
+    return this.exp !== null && now.toSeconds() >= this.exp;
+  }
+
+  public isNotYetValid(now: DateTime = DateTime.now()): boolean {
+    return this.nbf !== null && now.toSeconds() < this.nbf;
   }
 }

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import type { Locator } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { makeToken, mockTokenServiceApi } from './token-service-fixtures';
+
+const tokenNames = (table: Locator): Locator =>
+  table.locator('[data-testid^="token-row-"] > td:first-child');
 
 test.describe('Tokens page', () => {
   test('shows an empty state when there are no tokens', async ({ page }) => {
@@ -24,6 +28,20 @@ test.describe('Tokens page', () => {
     await page.goto('/tokens');
 
     await expect(page.getByTestId(`token-row-${token.name}`)).toBeVisible();
+    await expect(page.getByTestId('token-row-_session')).toBeHidden();
+  });
+
+  test('hides an expired session token', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await mockTokenServiceApi(page, [
+      makeToken({ name: '_session', exp: nowSeconds - 60 }),
+      makeToken({ name: 'token-expired', exp: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+
+    await expect(tokenNames(page.getByTestId('expired-tokens'))).toHaveText([
+      'token-expired',
+    ]);
     await expect(page.getByTestId('token-row-_session')).toBeHidden();
   });
 
@@ -93,19 +111,20 @@ test.describe('Tokens page', () => {
     ]);
     await page.goto('/tokens');
 
-    const names = page.locator('[data-testid^="token-row-"] > td:first-child');
+    const activeTokens = page.getByTestId('active-tokens');
+    const names = tokenNames(activeTokens);
     await expect(names).toHaveText(['token-a', 'token-c', 'token-b']);
     await expect(
-      page.getByRole('columnheader', { name: 'Issued At' })
+      activeTokens.getByRole('columnheader', { name: 'Issued At' })
     ).toHaveAttribute('aria-sort', 'descending');
 
     // Tokens without an expiration sort last in both directions.
-    await page.getByTestId('sort-by-exp').click();
+    await activeTokens.getByTestId('sort-by-exp').click();
     await expect(names).toHaveText(['token-c', 'token-a', 'token-b']);
     await expect(
-      page.getByRole('columnheader', { name: 'Expiration' })
+      activeTokens.getByRole('columnheader', { name: 'Expiration' })
     ).toHaveAttribute('aria-sort', 'ascending');
-    await page.getByTestId('sort-by-exp').click();
+    await activeTokens.getByTestId('sort-by-exp').click();
     await expect(names).toHaveText(['token-a', 'token-c', 'token-b']);
   });
 
@@ -117,9 +136,10 @@ test.describe('Tokens page', () => {
     ]);
     await page.goto('/tokens');
 
-    const names = page.locator('[data-testid^="token-row-"] > td:first-child');
+    const activeTokens = page.getByTestId('active-tokens');
+    const names = tokenNames(activeTokens);
     await expect(names).toHaveText(['token-c', 'token-a']);
-    await page.getByTestId('sort-by-name').click();
+    await activeTokens.getByTestId('sort-by-name').click();
     await expect(names).toHaveText(['token-a', 'token-c']);
 
     await page.getByTestId('create-token-button').click();
@@ -128,5 +148,105 @@ test.describe('Tokens page', () => {
 
     await expect(page.getByTestId('created-token-alert')).toBeVisible();
     await expect(names).toHaveText(['token-a', 'token-b', 'token-c']);
+  });
+
+  test('lists expired tokens in a separate section', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-active' }),
+      makeToken({ name: 'token-expired', exp: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+
+    const activeTokens = page.getByTestId('active-tokens');
+    const expiredTokens = page.getByTestId('expired-tokens');
+    await expect(tokenNames(activeTokens)).toHaveText(['token-active']);
+    await expect(tokenNames(expiredTokens)).toHaveText(['token-expired']);
+    await expect(activeTokens.getByTestId('token-count')).toHaveText('1');
+    await expect(expiredTokens.getByTestId('token-count')).toHaveText('1');
+  });
+
+  test('shows an empty active table when every token has expired', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-expired', exp: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+
+    const activeTokens = page.getByTestId('active-tokens');
+    await expect(tokenNames(page.getByTestId('expired-tokens'))).toHaveText([
+      'token-expired',
+    ]);
+    await expect(
+      activeTokens.getByTestId('empty-tokens-message')
+    ).toBeVisible();
+    await expect(activeTokens.getByTestId('token-count')).toHaveText('0');
+  });
+
+  test('lists the most recently expired tokens first', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const day = 60 * 60 * 24;
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a', exp: nowSeconds - 2 * day }),
+      makeToken({ name: 'token-b', exp: nowSeconds - day }),
+      makeToken({ name: 'token-c', exp: nowSeconds - 3 * day }),
+    ]);
+    await page.goto('/tokens');
+
+    const expiredTokens = page.getByTestId('expired-tokens');
+    await expect(tokenNames(expiredTokens)).toHaveText([
+      'token-b',
+      'token-a',
+      'token-c',
+    ]);
+    await expect(
+      expiredTokens.getByRole('columnheader', { name: 'Expiration' })
+    ).toHaveAttribute('aria-sort', 'descending');
+  });
+
+  test('sorts the active and expired tables independently', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const day = 60 * 60 * 24;
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a', iat: nowSeconds - 2 * day }),
+      makeToken({ name: 'token-b', iat: nowSeconds - day }),
+      makeToken({ name: 'token-c', exp: nowSeconds - 2 * day }),
+      makeToken({ name: 'token-d', exp: nowSeconds - day }),
+    ]);
+    await page.goto('/tokens');
+
+    const activeTokens = page.getByTestId('active-tokens');
+    const expiredTokens = page.getByTestId('expired-tokens');
+    await expect(tokenNames(activeTokens)).toHaveText(['token-b', 'token-a']);
+    await expect(tokenNames(expiredTokens)).toHaveText(['token-d', 'token-c']);
+
+    await activeTokens.getByTestId('sort-by-name').click();
+    await expect(tokenNames(activeTokens)).toHaveText(['token-a', 'token-b']);
+    await expect(tokenNames(expiredTokens)).toHaveText(['token-d', 'token-c']);
+  });
+
+  test('hides the expired section after its last token is deleted', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-active' }),
+      makeToken({ name: 'token-expired', exp: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+
+    const expiredTokens = page.getByTestId('expired-tokens');
+    await expiredTokens
+      .getByTestId('token-row-token-expired')
+      .getByTestId('delete-token-button')
+      .click();
+
+    await expect(expiredTokens).toBeHidden();
+    await expect(page.getByTestId('token-row-token-active')).toBeVisible();
+    expect(tokens.map((token) => token.name)).toEqual(['token-active']);
   });
 });

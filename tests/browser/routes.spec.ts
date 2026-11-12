@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { makeRoute, mockRouteRegistryApi } from './route-registry-fixtures';
+import { mockTokenServiceApi } from './token-service-fixtures';
 
 test.describe('Routes page', () => {
   test('shows an empty state when there are no routes', async ({ page }) => {
@@ -47,5 +48,23 @@ test.describe('Routes page', () => {
     await expect(nameHeader).not.toHaveAttribute('aria-sort');
     await page.getByTestId('sort-by-community').click();
     await expect(names).toHaveText(['route-1', 'route-10', 'route-2']);
+  });
+
+  test('keeps the sort after switching pages', async ({ page }) => {
+    await mockTokenServiceApi(page, []);
+    await mockRouteRegistryApi(page, [
+      makeRoute({ name: 'route-a' }),
+      makeRoute({ name: 'route-b' }),
+    ]);
+    await page.goto('/routes');
+
+    const names = page.locator('[data-testid^="route-row-"] > td:first-child');
+    await page.getByTestId('sort-by-name').click();
+    await expect(names).toHaveText(['route-b', 'route-a']);
+
+    await page.getByRole('tab', { name: 'Tokens' }).click();
+    await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
+    await page.getByRole('tab', { name: 'Routes' }).click();
+    await expect(names).toHaveText(['route-b', 'route-a']);
   });
 });
