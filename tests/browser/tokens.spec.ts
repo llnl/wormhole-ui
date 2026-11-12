@@ -72,4 +72,61 @@ test.describe('Tokens page', () => {
 
     await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
   });
+
+  test('sorts tokens by creation date, then by the clicked column', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const day = 60 * 60 * 24;
+    await mockTokenServiceApi(page, [
+      makeToken({
+        name: 'token-a',
+        iat: nowSeconds - day,
+        exp: nowSeconds + 3 * day,
+      }),
+      makeToken({ name: 'token-b', iat: nowSeconds - 3 * day, exp: null }),
+      makeToken({
+        name: 'token-c',
+        iat: nowSeconds - 2 * day,
+        exp: nowSeconds + day,
+      }),
+    ]);
+    await page.goto('/tokens');
+
+    const names = page.locator('[data-testid^="token-row-"] > td:first-child');
+    await expect(names).toHaveText(['token-a', 'token-c', 'token-b']);
+    await expect(
+      page.getByRole('columnheader', { name: 'Issued At' })
+    ).toHaveAttribute('aria-sort', 'descending');
+
+    // Tokens without an expiration sort last in both directions.
+    await page.getByTestId('sort-by-exp').click();
+    await expect(names).toHaveText(['token-c', 'token-a', 'token-b']);
+    await expect(
+      page.getByRole('columnheader', { name: 'Expiration' })
+    ).toHaveAttribute('aria-sort', 'ascending');
+    await page.getByTestId('sort-by-exp').click();
+    await expect(names).toHaveText(['token-a', 'token-c', 'token-b']);
+  });
+
+  test('keeps the sort after creating a token', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a', iat: nowSeconds - 120 }),
+      makeToken({ name: 'token-c', iat: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+
+    const names = page.locator('[data-testid^="token-row-"] > td:first-child');
+    await expect(names).toHaveText(['token-c', 'token-a']);
+    await page.getByTestId('sort-by-name').click();
+    await expect(names).toHaveText(['token-a', 'token-c']);
+
+    await page.getByTestId('create-token-button').click();
+    await page.getByTestId('token-name-input').fill('token-b');
+    await page.getByTestId('submit-create-token-button').click();
+
+    await expect(page.getByTestId('created-token-alert')).toBeVisible();
+    await expect(names).toHaveText(['token-a', 'token-b', 'token-c']);
+  });
 });
