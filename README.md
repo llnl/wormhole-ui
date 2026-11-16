@@ -36,6 +36,13 @@ needed. The mocks, models, and repositories are typed against `src/token-service
 regenerating either produces a diff.
 
 ```
+npm run test:coverage
+```
+
+Runs the same tests and reports code coverage: a per-file table in the terminal and an HTML report
+in `coverage/index.html`.
+
+```
 npm run test:integration
 ```
 

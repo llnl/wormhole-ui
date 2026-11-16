@@ -15,7 +15,7 @@ export default tseslint.config(
   // Turns off anything that conflicts with Prettier (must remain last in the chain)
   eslintConfigPrettier,
   {
-    ignores: ['dist/**', 'node_modules/**', 'vite.config.ts'],
+    ignores: ['coverage/**', 'dist/**', 'node_modules/**', 'vite.config.ts'],
   },
   {
     files: ['**/*.{ts,mts,cts,tsx}'],

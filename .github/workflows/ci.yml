@@ -55,7 +55,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run tests
-        run: npm run test
+        run: npm run test:coverage
 
   integration:
     name: Integration
