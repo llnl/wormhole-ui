@@ -56,7 +56,7 @@ const CreatedTokenAlert: m.Component<
       'div',
       {
         class:
-          'tw:bg-gray-100 tw:border tw:border-gray-300 tw:rounded-md tw:p-3 tw:mb-6 tw:flex tw:flex-col tw:gap-2',
+          'tw:bg-base-200 tw:border tw:border-base-300 tw:rounded-box tw:px-4 tw:py-3 tw:mb-4 tw:flex tw:flex-col tw:gap-2',
         'data-testid': 'created-token-alert',
       },
       [
@@ -69,7 +69,7 @@ const CreatedTokenAlert: m.Component<
             m(
               'span',
               {
-                class: 'tw:text-xs tw:font-semibold tw:text-gray-700',
+                class: 'tw:text-xs tw:font-semibold tw:text-base-content/80',
               },
               'Token created. It will not be shown again.'
             ),
@@ -77,11 +77,12 @@ const CreatedTokenAlert: m.Component<
               'button',
               {
                 class:
-                  'tw:d-btn tw:d-btn-xs tw:d-btn-ghost tw:text-gray-500 hover:tw:text-gray-800',
+                  'tw:d-btn tw:d-btn-xs tw:d-btn-ghost tw:text-base-content/70 tw:hover:text-base-content',
                 onclick: () => {
                   attrs.ondismiss();
                 },
                 title: 'Dismiss',
+                'aria-label': 'Dismiss',
               },
               '✕'
             ),
@@ -91,14 +92,14 @@ const CreatedTokenAlert: m.Component<
           'div',
           {
             class:
-              'tw:flex tw:items-center tw:justify-between tw:gap-3 tw:bg-white tw:border tw:border-gray-300 tw:rounded tw:p-2.5',
+              'tw:flex tw:items-center tw:justify-between tw:gap-3 tw:bg-base-100 tw:border tw:border-base-300 tw:rounded tw:p-2.5',
           },
           [
             m(
               'code',
               {
                 class:
-                  'tw:flex-1 tw:font-mono tw:text-sm tw:text-gray-900 tw:break-all tw:select-all',
+                  'tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:select-all',
               },
               attrs.token
             ),
@@ -106,7 +107,7 @@ const CreatedTokenAlert: m.Component<
               'button',
               {
                 class:
-                  'tw:d-btn tw:d-btn-sm tw:d-btn-ghost tw:shrink-0 tw:gap-1.5 tw:text-gray-700',
+                  'tw:d-btn tw:d-btn-sm tw:d-btn-ghost tw:shrink-0 tw:gap-1.5',
                 onclick: () => {
                   void copyToken();
                 },

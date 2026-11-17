@@ -14,7 +14,8 @@ export const makeToken = (overrides: Partial<MockToken> = {}): MockToken => {
     name: randomUUID(),
     id: randomUUID(),
     iat: nowSeconds,
-    nbf: nowSeconds,
+    // Like the token service, default nbf to the issue time.
+    nbf: overrides.iat ?? nowSeconds,
     exp: nowSeconds + 60 * 60 * 24 * 30,
     paths: [],
     scopes: [],

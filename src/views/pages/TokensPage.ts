@@ -20,7 +20,7 @@ const TokensPage: m.Component<Record<string, never>, TokensPageState> = {
         'div',
         {
           key: 'create-token',
-          class: 'tw:flex tw:justify-end tw:items-center tw:gap-3 tw:mb-6',
+          class: 'tw:flex tw:justify-end tw:items-center tw:gap-3 tw:mb-4',
         },
         [
           m(AttestTokensButton, {
@@ -32,6 +32,11 @@ const TokensPage: m.Component<Record<string, never>, TokensPageState> = {
             oncreated: (createdToken: string) => {
               state.createdToken = createdToken;
               state.tokenTableKey += 1;
+              // Switch to the default filter, where new tokens normally
+              // appear.
+              if (m.route.get() !== '/tokens') {
+                m.route.set('/tokens', undefined, { replace: true });
+              }
             },
           }),
         ]
