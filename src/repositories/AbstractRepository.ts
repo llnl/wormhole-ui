@@ -7,6 +7,18 @@ interface ApiError {
     message?: string;
   };
   message?: string;
+  status?: number;
+}
+
+/** An error response from the API. */
+export class HttpError extends Error {
+  public constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = 'HttpError';
+  }
 }
 
 const parseJson = (text: string): unknown => {
@@ -67,11 +79,18 @@ export abstract class AbstractRepository {
 
       const text = await response.text();
       if (!response.ok) {
-        throw Object.assign(new Error(text), { response: parseJson(text) });
+        throw Object.assign(new Error(text), {
+          response: parseJson(text),
+          status: response.status,
+        });
       }
       return (text ? JSON.parse(text) : null) as T;
     } catch (error: unknown) {
-      throw this.normalizeError(error);
+      const normalized = this.normalizeError(error);
+      const status = (error as ApiError | undefined)?.status;
+      throw status === undefined
+        ? normalized
+        : new HttpError(normalized.message, status);
     } finally {
       m.redraw();
     }
