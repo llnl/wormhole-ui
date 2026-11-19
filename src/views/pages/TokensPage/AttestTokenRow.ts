@@ -20,12 +20,6 @@ interface AttestTokenRowState {
   error: string | null;
 }
 
-const isExpired = (token: Token): boolean =>
-  token.exp !== null && DateTime.now().toSeconds() > token.exp;
-
-const isNotYetValid = (token: Token): boolean =>
-  token.nbf !== null && DateTime.now().toSeconds() < token.nbf;
-
 const AttestTokenRow: m.Component<AttestTokenRowAttrs, AttestTokenRowState> = {
   oninit: ({ state }) => {
     state.outcome = 'pending';
@@ -34,8 +28,8 @@ const AttestTokenRow: m.Component<AttestTokenRowAttrs, AttestTokenRowState> = {
   },
   view: ({ attrs, state }) => {
     const { token } = attrs;
-    const expired = isExpired(token);
-    const notYetValid = isNotYetValid(token);
+    const expired = token.isExpired();
+    const notYetValid = token.isNotYetValid();
     const expText = token.exp
       ? (DateTime.fromSeconds(token.exp).toISODate() ?? 'N/A')
       : 'N/A';

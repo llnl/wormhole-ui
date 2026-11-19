@@ -108,6 +108,25 @@ test.describe('Token attestation', () => {
     await expect(row.getByTestId('attest-token-delete-button')).toBeHidden();
   });
 
+  test('shows not-yet-valid tokens as non-actionable', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const token = makeToken({
+      iat: nowSeconds - 3600,
+      nbf: nowSeconds + 3600,
+    });
+    await mockTokenServiceApi(page, [token]);
+    await page.goto('/tokens');
+
+    await page.getByTestId('attest-tokens-button').click();
+    await page.getByTestId('attest-acknowledge-button').click();
+
+    const row = page.getByTestId(`attest-token-row-${token.name}`);
+    await expect(row.getByTestId('attest-token-status')).toHaveText(
+      'Not Yet Valid'
+    );
+    await expect(row.getByTestId('attest-token-keep-button')).toBeHidden();
+  });
+
   test('shows an empty message when there are no tokens to attest', async ({
     page,
   }) => {
