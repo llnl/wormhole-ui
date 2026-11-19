@@ -77,6 +77,7 @@ test.describe('Tokens page', () => {
     const row = page.getByTestId(`token-row-${token.name}`);
     await expect(row).toBeVisible();
     await row.getByTestId('delete-token-button').click();
+    await page.getByTestId('confirm-delete-button').click();
 
     await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
   });
@@ -488,25 +489,25 @@ test.describe('Token filters', () => {
       await expect(page.getByTestId('filter-count').first()).toHaveText('3');
 
       const layout = await page.evaluate(() => {
-        const textLeft = (selector: string): number => {
-          const element = document.querySelector(selector);
-          if (element === null) {
-            throw new Error(`Missing ${selector}`);
-          }
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          return range.getBoundingClientRect().left;
-        };
+        const tab = document.querySelector('[data-testid="filter-active"]');
+        if (tab === null) {
+          throw new Error('Missing the Active filter');
+        }
+        const range = document.createRange();
+        range.selectNodeContents(tab);
         const nav = document.querySelector('nav[aria-label="Filter tokens"]');
         return {
-          tabLabel: textLeft('[data-testid="filter-active"]'),
-          nameHeader: textLeft('[data-testid="sort-by-name"]'),
+          tabLabel: range.getBoundingClientRect().left,
+          selectAll:
+            document
+              .querySelector('[data-testid="select-all"]')
+              ?.getBoundingClientRect().left ?? NaN,
           scrollInset:
             (nav?.getBoundingClientRect().left ?? NaN) -
             (nav?.parentElement?.getBoundingClientRect().left ?? NaN),
         };
       });
-      expect(Math.abs(layout.tabLabel - layout.nameHeader)).toBeLessThan(1);
+      expect(Math.abs(layout.tabLabel - layout.selectAll)).toBeLessThan(1);
       // Tabs that overflow scroll out at the card's edge, not inside it.
       expect(layout.scrollInset).toBe(0);
     }
@@ -662,6 +663,7 @@ test.describe('Token filters', () => {
     await page.goto('/tokens?filter=expired');
 
     await page.getByRole('button', { name: 'Delete token-expired' }).click();
+    await page.getByTestId('confirm-delete-button').click();
 
     await expect(page.getByTestId('empty-tokens-message')).toHaveText(
       'No expired tokens'
@@ -694,5 +696,523 @@ test.describe('Token filters', () => {
     // The switch replaces the filtered entry, so Back skips it.
     await page.goBack();
     await expect(page).toHaveURL('/tokens');
+  });
+});
+
+test.describe('Deleting tokens', () => {
+  const names = (page: Page): Locator => page.getByTestId('token-name');
+  const select = (page: Page, name: string): Locator =>
+    page.getByRole('checkbox', { name: `Select ${name}`, exact: true });
+  const deleteSelected = (page: Page): Locator =>
+    page.getByRole('button', { name: 'Delete selected tokens' });
+  const dialog = (page: Page): Locator => page.getByRole('dialog');
+
+  // Holds the first DELETE request for each of the given names until the
+  // returned function is called, then lets them through or fails them.
+  const holdDeletes = async (
+    page: Page,
+    heldNames: string[]
+  ): Promise<(failure?: { status: number; detail: string }) => void> => {
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let failure: { status: number; detail: string } | undefined;
+    const held = new Set(heldNames);
+    await page.route(
+      (url) => url.pathname === '/token-service/api/v1/token',
+      async (route) => {
+        const name = new URL(route.request().url()).searchParams.get('name');
+        if (route.request().method() !== 'DELETE' || !held.delete(name ?? '')) {
+          await route.fallback();
+          return;
+        }
+        await released;
+        if (failure === undefined) {
+          await route.fallback();
+        } else {
+          await route.fulfill({
+            status: failure.status,
+            json: { detail: failure.detail },
+          });
+        }
+      }
+    );
+    return (result) => {
+      failure = result;
+      release();
+    };
+  };
+
+  test('asks before deleting a single token', async ({ page }) => {
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+      makeToken({ name: 'token-c' }),
+    ]);
+    await page.goto('/tokens?filter=all');
+    await page.getByTestId('sort-by-name').click();
+    await expect(names(page)).toHaveText(['token-a', 'token-b', 'token-c']);
+
+    const deleteButton = page.getByRole('button', { name: 'Delete token-a' });
+    await deleteButton.click();
+    await expect(dialog(page)).toHaveAccessibleName('Delete token?');
+    await expect(dialog(page)).toHaveAccessibleDescription(
+      'token-a will be permanently deleted.'
+    );
+    await expect(
+      dialog(page).getByRole('button', { name: 'Cancel' })
+    ).toBeFocused();
+
+    await dialog(page).getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(deleteButton).toBeFocused();
+    expect(tokens).toHaveLength(3);
+
+    await deleteButton.click();
+    await dialog(page)
+      .getByRole('button', { name: 'Delete token', exact: true })
+      .click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(names(page)).toHaveText(['token-b', 'token-c']);
+    await expect(page.getByRole('status')).toHaveText('Deleted token-a');
+    expect(tokens.map((token) => token.name)).toEqual(['token-b', 'token-c']);
+    // The next row's Delete moves up into the deleted one's place, or the
+    // previous row's if it was the last.
+    await expect(
+      page.getByRole('button', { name: 'Delete token-b' })
+    ).toBeFocused();
+
+    await page.getByRole('button', { name: 'Delete token-c' }).click();
+    await dialog(page).getByTestId('confirm-delete-button').click();
+    await expect(names(page)).toHaveText(['token-b']);
+    await expect(
+      page.getByRole('button', { name: 'Delete token-b' })
+    ).toBeFocused();
+  });
+
+  test('cancels with Escape or by clicking outside', async ({ page }) => {
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+    ]);
+    await page.goto('/tokens');
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeHidden();
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.mouse.click(5, 5);
+    await expect(dialog(page)).toBeHidden();
+
+    await expect(names(page)).toHaveText(['token-a']);
+    expect(tokens).toHaveLength(1);
+  });
+
+  test('deletes the selected tokens together', async ({ page }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a', iat: nowSeconds - 30 }),
+      makeToken({ name: 'token-b', iat: nowSeconds - 20 }),
+      makeToken({ name: 'token-c', iat: nowSeconds - 10 }),
+    ]);
+    await page.goto('/tokens');
+
+    await select(page, 'token-a').check();
+    await select(page, 'token-c').check();
+    const bar = page.getByTestId('selection-bar');
+    await expect(bar).toContainText('2 selected');
+    await expect(page.getByTestId('filter-active')).toBeHidden();
+
+    await deleteSelected(page).click();
+    await expect(dialog(page)).toHaveAccessibleName('Delete 2 tokens?');
+    // In the table's order.
+    await expect(
+      dialog(page).getByTestId('delete-tokens-list').getByRole('listitem')
+    ).toHaveText(['token-c', 'token-a']);
+    await dialog(page).getByRole('button', { name: 'Delete 2 tokens' }).click();
+
+    await expect(dialog(page)).toBeHidden();
+    await expect(names(page)).toHaveText(['token-b']);
+    await expect(page.getByRole('status')).toHaveText('Deleted 2 tokens');
+    expect(tokens.map((token) => token.name)).toEqual(['token-b']);
+    await expect(bar).toBeHidden();
+    await expect(
+      page.getByTestId('filter-active').getByTestId('filter-count')
+    ).toHaveText('1');
+    await expect(page.getByTestId('select-all')).toBeFocused();
+    // Cleared, so the next delete's announcement isn't swallowed as a repeat.
+    await page.getByRole('button', { name: 'Delete token-b' }).click();
+    await expect(page.getByRole('status')).toBeEmpty();
+  });
+
+  test('selects all the tokens in the current filter only', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const day = 60 * 60 * 24;
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-active' }),
+      makeToken({ name: 'token-old', exp: nowSeconds - 2 * day }),
+      makeToken({ name: 'token-older', exp: nowSeconds - 3 * day }),
+    ]);
+    await page.goto('/tokens?filter=expired');
+
+    const selectAll = page.getByRole('checkbox', {
+      name: 'Select all expired tokens',
+    });
+    await selectAll.check();
+    await expect(page.getByTestId('selection-bar')).toContainText('2 selected');
+    await expect(select(page, 'token-old')).toBeChecked();
+    await expect(select(page, 'token-older')).toBeChecked();
+
+    await select(page, 'token-old').uncheck();
+    await expect(page.getByTestId('selection-bar')).toContainText('1 selected');
+    expect(
+      await selectAll.evaluate((el) => (el as HTMLInputElement).indeterminate)
+    ).toBe(true);
+    await selectAll.click();
+    await expect(selectAll).toBeChecked();
+    expect(
+      await selectAll.evaluate((el) => (el as HTMLInputElement).indeterminate)
+    ).toBe(false);
+
+    await deleteSelected(page).click();
+    await dialog(page).getByRole('button', { name: 'Delete 2 tokens' }).click();
+    await expect(page.getByTestId('empty-tokens-message')).toHaveText(
+      'No expired tokens'
+    );
+    expect(tokens.map((token) => token.name)).toEqual(['token-active']);
+    await expect(selectAll).toBeDisabled();
+    await expect(selectAll).not.toBeChecked();
+    await expect(page.getByTestId('filter-expired')).toBeFocused();
+  });
+
+  test('keeps the selection when sorting but not when the filter changes', async ({
+    page,
+  }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    await page.goto('/tokens?filter=all');
+    await page.getByTestId('filter-active').click();
+    await expect(page).toHaveURL('/tokens');
+
+    await select(page, 'token-a').check();
+    await page.getByTestId('sort-by-name').click();
+    await expect(names(page)).toHaveText(['token-a', 'token-b']);
+    await expect(select(page, 'token-a')).toBeChecked();
+
+    await page.goBack();
+    await expect(page.getByRole('table', { name: 'All tokens' })).toBeVisible();
+    await expect(page.getByTestId('selection-bar')).toBeHidden();
+    await expect(select(page, 'token-a')).not.toBeChecked();
+
+    await page.goForward();
+    await expect(
+      page.getByRole('table', { name: 'Active tokens' })
+    ).toBeVisible();
+    await expect(page.getByTestId('selection-bar')).toBeHidden();
+    await expect(select(page, 'token-a')).not.toBeChecked();
+  });
+
+  test('clears the selection', async ({ page }) => {
+    await mockTokenServiceApi(page, [makeToken({ name: 'token-a' })]);
+    await page.goto('/tokens');
+
+    await select(page, 'token-a').check();
+    await page.getByRole('button', { name: 'Clear selection' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(select(page, 'token-a')).not.toBeChecked();
+    // In place of the Clear button, which went with the selection.
+    await expect(page.getByTestId('filter-active')).toBeFocused();
+  });
+
+  test('shows the selection in place of the filters', async ({ page }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    for (const width of [1280, 360]) {
+      await page.setViewportSize({ width, height: 640 });
+      await page.goto('/tokens');
+      await expect(page.getByTestId('filter-count').first()).toHaveText('2');
+      // The filters leave the accessibility tree while hidden.
+      const strip = page.locator('div:has(> nav[aria-label="Filter tokens"])');
+      const before = await strip.boundingBox();
+      expect(before).not.toBeNull();
+
+      await select(page, 'token-a').check();
+      await expect(page.getByTestId('selection-bar')).toContainText(
+        '1 selected'
+      );
+      expect(await strip.boundingBox()).toEqual(before);
+      await expect(deleteSelected(page)).toBeInViewport({ ratio: 1 });
+      const layout = await page.evaluate(() => {
+        const textLeft = (selector: string): number => {
+          const element = document.querySelector(selector);
+          if (element === null) {
+            throw new Error(`Missing ${selector}`);
+          }
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return range.getBoundingClientRect().left;
+        };
+        return {
+          count: textLeft('[data-testid="selection-bar"] span'),
+          tabLabel: textLeft('[data-testid="filter-active"]'),
+        };
+      });
+      // The strip's content starts in the same place with or without a
+      // selection.
+      expect(Math.abs(layout.count - layout.tabLabel)).toBeLessThan(1);
+      await expect(
+        page.getByRole('button', { name: 'Clear selection' })
+      ).toBeInViewport({ ratio: 1 });
+    }
+  });
+
+  test('keeps the tokens that fail to delete in the dialog', async ({
+    page,
+  }) => {
+    const tokens = await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    const release = await holdDeletes(page, ['token-b']);
+    await page.goto('/tokens');
+
+    await page.getByTestId('select-all').check();
+    await deleteSelected(page).click();
+    await dialog(page).getByRole('button', { name: 'Delete 2 tokens' }).click();
+    release({ status: 500, detail: 'Database unavailable' });
+
+    await expect(dialog(page).getByRole('alert')).toHaveText(
+      'Unable to delete 1 of 2 tokens: Database unavailable'
+    );
+    await expect(dialog(page)).toHaveAccessibleName('Delete token?');
+    await expect(dialog(page)).toContainText(
+      'token-b will be permanently deleted.'
+    );
+    await expect(names(page)).toHaveText(['token-b']);
+    expect(tokens.map((token) => token.name)).toEqual(['token-b']);
+    await expect(
+      dialog(page).getByRole('button', { name: 'Cancel' })
+    ).toBeFocused();
+
+    await dialog(page)
+      .getByRole('button', { name: 'Delete token', exact: true })
+      .click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
+    expect(tokens).toHaveLength(0);
+  });
+
+  test('treats a token that is already gone as deleted', async ({ page }) => {
+    await mockTokenServiceApi(page, [makeToken({ name: 'token-a' })]);
+    const release = await holdDeletes(page, ['token-a']);
+    await page.goto('/tokens');
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    await dialog(page).getByTestId('confirm-delete-button').click();
+    release({ status: 404, detail: 'Token not found' });
+
+    await expect(dialog(page)).toBeHidden();
+    await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
+  });
+
+  test('disables the dialog while deleting', async ({ page }) => {
+    await mockTokenServiceApi(page, [makeToken({ name: 'token-a' })]);
+    const release = await holdDeletes(page, ['token-a']);
+    await page.goto('/tokens');
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    const cancel = dialog(page).getByRole('button', { name: 'Cancel' });
+    // Hovering waits for the dialog to finish scaling in.
+    await cancel.hover();
+    const beforePending = await cancel.boundingBox();
+    await dialog(page).getByTestId('confirm-delete-button').click();
+    await expect(
+      dialog(page).getByTestId('confirm-delete-button')
+    ).toHaveAccessibleName('Deleting...');
+    // The buttons keep their places under the pointer.
+    expect(await cancel.boundingBox()).toEqual(beforePending);
+    // Disabled buttons can't hold focus, so the dialog's box does. (Not the
+    // dialog itself, which would get a focus ring around the whole screen.)
+    await expect(page.locator('dialog [tabindex="-1"]')).toBeFocused();
+    await expect(
+      dialog(page).getByTestId('confirm-delete-button')
+    ).toBeDisabled();
+    await expect(
+      dialog(page).getByRole('button', { name: 'Cancel' })
+    ).toBeDisabled();
+    await page.locator('dialog').evaluate((el) => {
+      el.addEventListener('close', () => {
+        el.dataset.closed = 'true';
+      });
+    });
+    await page.mouse.click(5, 5);
+    await page.keyboard.press('Escape');
+    // Gives a close event time to arrive.
+    await page.waitForTimeout(100);
+    await expect(page.locator('dialog')).not.toHaveAttribute('data-closed');
+
+    release();
+    await expect(dialog(page)).toBeHidden();
+    await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
+  });
+
+  test('keeps the dialog open until deleting finishes', async ({ page }) => {
+    await mockTokenServiceApi(page, [makeToken({ name: 'token-a' })]);
+    const release = await holdDeletes(page, ['token-a']);
+    await page.goto('/tokens');
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    await dialog(page).getByTestId('confirm-delete-button').click();
+    await expect(
+      dialog(page).getByTestId('confirm-delete-button')
+    ).toBeDisabled();
+    // Browsers close the dialog on a repeated Escape, even while it's busy.
+    await page.locator('dialog').evaluate((el) => {
+      (el as HTMLDialogElement).close();
+    });
+    await expect(page.locator('dialog')).toHaveJSProperty('open', true);
+    await expect(page.locator('dialog [tabindex="-1"]')).toBeFocused();
+
+    release({ status: 500, detail: 'Database unavailable' });
+    await expect(dialog(page).getByRole('alert')).toHaveText(
+      'Unable to delete token: Database unavailable'
+    );
+    await expect(
+      dialog(page).getByRole('button', { name: 'Cancel' })
+    ).toBeFocused();
+    await expect(names(page)).toHaveText(['token-a']);
+  });
+
+  test('ignores a second click on the confirm button', async ({ page }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    const deletes: string[] = [];
+    await page.route(
+      (url) => url.pathname === '/token-service/api/v1/token',
+      async (route) => {
+        if (route.request().method() === 'DELETE') {
+          deletes.push(
+            new URL(route.request().url()).searchParams.get('name') ?? ''
+          );
+        }
+        await route.fallback();
+      }
+    );
+    await page.goto('/tokens');
+
+    await page.getByTestId('select-all').check();
+    await deleteSelected(page).click();
+    await dialog(page).getByTestId('confirm-delete-button').dblclick();
+
+    await expect(page.getByTestId('empty-tokens-message')).toBeVisible();
+    expect(deletes.sort()).toEqual(['token-a', 'token-b']);
+  });
+
+  test('says when none of the tokens could be deleted', async ({ page }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    const release = await holdDeletes(page, ['token-a', 'token-b']);
+    await page.goto('/tokens');
+
+    await page.getByTestId('select-all').check();
+    await deleteSelected(page).click();
+    await dialog(page).getByRole('button', { name: 'Delete 2 tokens' }).click();
+    release({ status: 500, detail: 'Database unavailable' });
+
+    await expect(dialog(page).getByRole('alert')).toHaveText(
+      'Unable to delete 2 tokens: Database unavailable'
+    );
+    await expect(names(page)).toHaveCount(2);
+  });
+
+  test('counts checkboxes toggled in the same tick', async ({ page }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    await page.goto('/tokens');
+    await expect(select(page, 'token-a')).toBeVisible();
+
+    // Both toggles land before a redraw.
+    await page.evaluate(() => {
+      for (const name of ['token-a', 'token-b']) {
+        document
+          .querySelector<HTMLInputElement>(`[aria-label="Select ${name}"]`)
+          ?.click();
+      }
+    });
+    await expect(page.getByTestId('selection-bar')).toContainText('2 selected');
+  });
+
+  test('keeps the dialog open when Cancel lands as a delete starts', async ({
+    page,
+  }) => {
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-a' }),
+      makeToken({ name: 'token-b' }),
+    ]);
+    const release = await holdDeletes(page, ['token-a']);
+    await page.goto('/tokens');
+
+    await page.getByRole('button', { name: 'Delete token-a' }).click();
+    await expect(dialog(page)).toBeVisible();
+    // Both clicks land before the redraw that disables the buttons.
+    await page.evaluate(() => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="confirm-delete-button"]'
+        )
+        ?.click();
+      Array.from(document.querySelectorAll<HTMLButtonElement>('dialog button'))
+        .find((button) => button.textContent === 'Cancel')
+        ?.click();
+    });
+    await expect(page.locator('dialog')).toHaveJSProperty('open', true);
+
+    release({ status: 500, detail: 'Database unavailable' });
+    await expect(dialog(page).getByRole('alert')).toHaveText(
+      'Unable to delete token: Database unavailable'
+    );
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeHidden();
+    // The next dialog still opens.
+    await page.getByRole('button', { name: 'Delete token-b' }).click();
+    await expect(dialog(page)).toContainText(
+      'token-b will be permanently deleted.'
+    );
+  });
+
+  test('closes the dialog when browser navigation changes the filter', async ({
+    page,
+  }) => {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    await mockTokenServiceApi(page, [
+      makeToken({ name: 'token-active' }),
+      makeToken({ name: 'token-old', exp: nowSeconds - 60 }),
+    ]);
+    await page.goto('/tokens');
+    await page.getByTestId('filter-expired').click();
+    await expect(names(page)).toHaveText(['token-old']);
+
+    await page.getByRole('button', { name: 'Delete token-old' }).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.goBack();
+
+    await expect(names(page)).toHaveText(['token-active']);
+    await expect(dialog(page)).toBeHidden();
+    await expect(page.getByTestId('filter-active')).toBeFocused();
   });
 });

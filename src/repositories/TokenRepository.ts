@@ -1,4 +1,4 @@
-import { AbstractRepository } from './AbstractRepository';
+import { AbstractRepository, HttpError } from './AbstractRepository';
 import { getConfig, getUiConfig } from '../config';
 import { Token } from '../models/Token';
 import type {
@@ -35,7 +35,14 @@ export class TokenRepository extends AbstractRepository {
   }
 
   public async deleteToken(token: Token): Promise<void> {
-    await this.delete('/api/v1/token', { name: token.name });
+    try {
+      await this.delete('/api/v1/token', { name: token.name });
+    } catch (error: unknown) {
+      // Already deleted, for example from another tab.
+      if (!(error instanceof HttpError && error.status === 404)) {
+        throw error;
+      }
+    }
   }
 
   public async attestToken(token: Token): Promise<void> {

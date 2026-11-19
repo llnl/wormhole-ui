@@ -48,6 +48,7 @@ test.describe.serial('Tokens page (live backend)', () => {
     await expect(reloadedRow).toBeVisible();
 
     await reloadedRow.getByTestId('delete-token-button').click();
+    await page.getByTestId('confirm-delete-button').click();
     await expect(reloadedRow).toBeHidden();
   });
 
