@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Locator, Page } from '@playwright/test';
+import { DateTime } from 'luxon';
 import { test, expect } from './fixtures';
 import {
   makeToken,
@@ -67,6 +68,105 @@ test.describe('Tokens page', () => {
 
     await page.getByRole('button', { name: 'Dismiss' }).click();
     await expect(page.getByTestId('created-token-alert')).toBeHidden();
+  });
+
+  test('shows the error when the name is already taken', async ({ page }) => {
+    await mockTokenServiceApi(page, [makeToken({ name: 'token-a' })]);
+    await page.goto('/tokens');
+
+    await page.getByTestId('create-token-button').click();
+    await page.getByTestId('token-name-input').fill('token-a');
+    await page.getByTestId('submit-create-token-button').click();
+
+    await expect(
+      page.getByText('Token name: token-a already exists')
+    ).toBeVisible();
+    await expect(page.getByTestId('token-name-input')).toHaveValue('token-a');
+
+    await page.getByTestId('token-name-input').fill('token-b');
+    await page.getByTestId('submit-create-token-button').click();
+    await expect(page.getByTestId('token-row-token-b')).toBeVisible();
+  });
+
+  test('cancelling the create dialog discards what was entered', async ({
+    page,
+  }) => {
+    const tokens = await mockTokenServiceApi(page, []);
+    await page.goto('/tokens');
+
+    await page.getByTestId('create-token-button').click();
+    await page.getByTestId('token-name-input').fill('token-a');
+    await page.getByTestId('token-nbf-input').fill('2030-01-01');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Create Token' })
+    ).toBeHidden();
+    expect(tokens).toHaveLength(0);
+
+    await page.getByTestId('create-token-button').click();
+    await expect(page.getByTestId('token-name-input')).toHaveValue('');
+    await expect(page.getByTestId('token-nbf-input')).toHaveValue('');
+  });
+
+  test.describe('in a timezone away from UTC', () => {
+    const zone = 'America/Los_Angeles';
+    test.use({ timezoneId: zone });
+
+    test('creates a token valid between the chosen dates', async ({ page }) => {
+      const nbfDate = DateTime.now().plus({ days: 10 }).toISODate();
+      const expDate = DateTime.now().plus({ days: 40 }).toISODate();
+      const tokens = await mockTokenServiceApi(page, []);
+      await page.goto('/tokens');
+
+      await page.getByTestId('create-token-button').click();
+      await page.getByTestId('token-name-input').fill('token-a');
+      await page.getByTestId('token-nbf-input').fill(nbfDate);
+      await page.getByTestId('token-exp-input').fill(expDate);
+      await page.getByTestId('submit-create-token-button').click();
+
+      // The dates are sent as local midnight.
+      const row = page.getByTestId('token-row-token-a');
+      await expect(row).toBeVisible();
+      expect(tokens[0].nbf).toBe(
+        DateTime.fromISO(nbfDate, { zone }).toSeconds()
+      );
+      expect(tokens[0].exp).toBe(
+        DateTime.fromISO(expDate, { zone }).toSeconds()
+      );
+      await expect(row.getByRole('cell').nth(2)).toHaveText(nbfDate);
+      await expect(row.getByRole('cell').nth(3)).toHaveText(expDate);
+    });
+  });
+
+  test.describe('with clipboard access', () => {
+    test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
+
+    test('copies the new secret to the clipboard', async ({ page }) => {
+      await mockTokenServiceApi(page, []);
+      await page.goto('/tokens');
+
+      await page.getByTestId('create-token-button').click();
+      await page.getByTestId('token-name-input').fill('token-a');
+      await page.getByTestId('submit-create-token-button').click();
+
+      const alert = page.getByTestId('created-token-alert');
+      await expect(alert).toBeVisible();
+      const secret = await alert.locator('code').innerText();
+      expect(secret).not.toBe('');
+      await alert.getByRole('button', { name: 'Copy', exact: true }).click();
+
+      await expect(
+        alert.getByRole('button', { name: 'Copied', exact: true })
+      ).toBeVisible();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+        secret
+      );
+      // The confirmation is temporary.
+      await expect(
+        alert.getByRole('button', { name: 'Copy', exact: true })
+      ).toBeVisible();
+    });
   });
 
   test('deletes a token', async ({ page }) => {

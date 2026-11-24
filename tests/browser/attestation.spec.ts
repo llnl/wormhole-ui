@@ -1,5 +1,30 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { makeToken, mockTokenServiceApi } from './token-service-fixtures';
+
+// Register after mockTokenServiceApi: the last route wins, and the rest
+// fall back to the mock.
+const failNextRequest = async (
+  page: Page,
+  method: string,
+  pathname: string
+): Promise<void> => {
+  let failed = false;
+  await page.route(
+    (url) => url.pathname === pathname,
+    async (route) => {
+      if (failed || route.request().method() !== method) {
+        await route.fallback();
+        return;
+      }
+      failed = true;
+      await route.fulfill({
+        status: 500,
+        json: { detail: 'Database unavailable' },
+      });
+    }
+  );
+};
 
 test.describe('Token attestation', () => {
   test('walks through the acknowledgement before listing tokens', async ({
@@ -77,6 +102,58 @@ test.describe('Token attestation', () => {
 
     await page.getByTestId('attest-done-button').click();
     await expect(page.getByTestId(`token-row-${token.name}`)).toBeHidden();
+  });
+
+  test('shows the error when keeping a token fails, until it succeeds', async ({
+    page,
+  }) => {
+    const token = makeToken();
+    await mockTokenServiceApi(page, [token]);
+    await failNextRequest(
+      page,
+      'PATCH',
+      '/token-service/api/v1/token/attestation'
+    );
+    await page.goto('/tokens');
+
+    await page.getByTestId('attest-tokens-button').click();
+    await page.getByTestId('attest-acknowledge-button').click();
+    const row = page.getByTestId(`attest-token-row-${token.name}`);
+    const keep = row.getByTestId('attest-token-keep-button');
+    await keep.click();
+
+    const error = row.getByText('Database unavailable');
+    await expect(error).toBeVisible();
+    await expect(row.getByTestId('attest-token-status')).toHaveCount(0);
+    await expect(keep).toBeEnabled();
+
+    await keep.click();
+    await expect(row.getByTestId('attest-token-status')).toHaveText('Kept');
+    await expect(error).toHaveCount(0);
+  });
+
+  test('shows the error when deleting a token fails, until it succeeds', async ({
+    page,
+  }) => {
+    const token = makeToken();
+    await mockTokenServiceApi(page, [token]);
+    await failNextRequest(page, 'DELETE', '/token-service/api/v1/token');
+    await page.goto('/tokens');
+
+    await page.getByTestId('attest-tokens-button').click();
+    await page.getByTestId('attest-acknowledge-button').click();
+    const row = page.getByTestId(`attest-token-row-${token.name}`);
+    const remove = row.getByTestId('attest-token-delete-button');
+    await remove.click();
+
+    const error = row.getByText('Database unavailable');
+    await expect(error).toBeVisible();
+    await expect(row.getByTestId('attest-token-status')).toHaveCount(0);
+    await expect(remove).toBeEnabled();
+
+    await remove.click();
+    await expect(row.getByTestId('attest-token-status')).toHaveText('Deleted');
+    await expect(error).toHaveCount(0);
   });
 
   test('does not offer the session token for attestation', async ({ page }) => {
