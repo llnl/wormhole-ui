@@ -47,10 +47,19 @@ export const mockTokenServiceApi = async (
       },
       POST: async (route) => {
         const body = new URLSearchParams(route.request().postData() ?? '');
+        const name = body.get('name') ?? randomUUID();
+        // Like the token service, names are unique.
+        if (tokens.some((token) => token.name === name)) {
+          await route.fulfill({
+            status: 409,
+            json: { detail: `Token name: ${name} already exists` },
+          });
+          return;
+        }
         const nowSeconds = Math.floor(Date.now() / 1000);
         const generatedId = randomUUID();
         const created = makeToken({
-          name: body.get('name') ?? randomUUID(),
+          name,
           id: generatedId,
           nbf: body.has('nbf') ? Number(body.get('nbf')) : nowSeconds,
           exp: body.has('exp')

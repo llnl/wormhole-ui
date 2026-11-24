@@ -133,6 +133,7 @@ const CreateTokenButton: m.Component<
                 m('input', {
                   class: 'tw:d-input tw:d-input-bordered tw:w-full',
                   type: 'date',
+                  'data-testid': 'token-nbf-input',
                   value: state.nbf,
                   oninput: (event: InputEvent) => {
                     state.nbf = (event.currentTarget as HTMLInputElement).value;
@@ -152,6 +153,7 @@ const CreateTokenButton: m.Component<
                 m('input', {
                   class: 'tw:d-input tw:d-input-bordered tw:w-full',
                   type: 'date',
+                  'data-testid': 'token-exp-input',
                   value: state.exp,
                   oninput: (event: InputEvent) => {
                     state.exp = (event.currentTarget as HTMLInputElement).value;

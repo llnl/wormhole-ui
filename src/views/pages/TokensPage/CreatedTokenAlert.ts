@@ -37,6 +37,7 @@ const CreatedTokenAlert: m.Component<
           state.copied = false;
           m.redraw();
         }, 2000);
+        m.redraw();
       } catch {
         // Clipboard write failed or not supported in environment
       }
